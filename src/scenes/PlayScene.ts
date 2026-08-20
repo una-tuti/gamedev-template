@@ -10,9 +10,9 @@ export class PlayScene extends Phaser.Scene {
   private jumpKey!: Phaser.Input.Keyboard.Key;
   private dashKey!: Phaser.Input.Keyboard.Key;
   private playerVelocityY = 0;
-  private isGrounded = false;
   private terrainTiles: Array<{ x: number; y: number; width: number; height: number }> = [];
   private jumpHoldTimer = 0;
+  private jumpStartY = 0;
   private dashTimer = 0;
   private dashDirection = 0;
   private facingDirection = 1;
@@ -157,7 +157,6 @@ export class PlayScene extends Phaser.Scene {
     this.player.x = this.lastSafeTileTop.x;
     this.player.y = this.lastSafeTileTop.y;
     this.playerVelocityY = 0;
-    this.isGrounded = true;
     this.jumpHoldTimer = 0;
     this.dashTimer = 0;
     this.dashDirection = 0;
@@ -193,7 +192,6 @@ export class PlayScene extends Phaser.Scene {
 
   private resolveVerticalCollisions(previousY: number): void {
     const halfHeight = this.player.height / 2;
-    this.isGrounded = false;
 
     for (const tile of this.terrainTiles) {
       const tileLeft = tile.x;
@@ -215,8 +213,8 @@ export class PlayScene extends Phaser.Scene {
       if (prevBottom <= tileTop && playerBottom >= tileTop && this.playerVelocityY >= 0) {
         this.player.y = tileTop - halfHeight;
         this.playerVelocityY = 0;
-        this.isGrounded = true;
         this.jumpHoldTimer = 0;
+        this.jumpStartY = this.player.y;
         this.lastSafeTileTop = {
           x: tile.x + tile.width / 2,
           y: tileTop - halfHeight,
@@ -244,6 +242,7 @@ export class PlayScene extends Phaser.Scene {
     const dashSpeed = dashDistance / dashDuration;
     const gravity = 3200;
     const jumpCells = 4;
+    const jumpHeight = tileSize * jumpCells;
     const jumpVelocity = (tileSize * jumpCells) / 0.05;
     const deltaSeconds = this.game.loop.delta / 1000;
     const fallThreshold = this.scale.height + 200;
@@ -284,18 +283,20 @@ export class PlayScene extends Phaser.Scene {
 
     this.resolveHorizontalCollisions(previousX);
 
-    const canJumpInAir = this.isGrounded || !this.isGrounded;
-    if (Phaser.Input.Keyboard.JustDown(this.jumpKey) && canJumpInAir) {
+    if (Phaser.Input.Keyboard.JustDown(this.jumpKey)) {
       this.playerVelocityY = -jumpVelocity;
-      this.jumpHoldTimer = 0.1;
-      this.isGrounded = false;
+      this.jumpStartY = this.player.y;
+      this.jumpHoldTimer = 0;
     }
 
     if (this.dashTimer > 0) {
       this.playerVelocityY = 0;
+    } else if (this.playerVelocityY < 0 && this.player.y <= this.jumpStartY - jumpHeight) {
+      this.playerVelocityY = 0;
+      this.jumpHoldTimer = 0.2;
     } else if (this.jumpHoldTimer > 0) {
       this.jumpHoldTimer = Math.max(0, this.jumpHoldTimer - deltaSeconds);
-      this.playerVelocityY = Math.min(this.playerVelocityY, -jumpVelocity * 0.4);
+      this.playerVelocityY = 0;
     } else {
       this.playerVelocityY += gravity * deltaSeconds;
     }
