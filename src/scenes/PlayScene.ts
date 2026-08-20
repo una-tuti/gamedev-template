@@ -127,8 +127,8 @@ export class PlayScene extends Phaser.Scene {
     const jumpPowerX = hpBarX + hpBarWidth + 18;
     const jumpPowerY = hpBarY + hpBarHeight + 18;
     this.jumpPowerLabel = this.add.text(
-      jumpPowerX,
-      jumpPowerY - 20,
+      jumpPowerX - 200,
+      hpBarY + hpBarHeight + 50,
       'JP',
       {
         color: '#000000',
@@ -141,7 +141,7 @@ export class PlayScene extends Phaser.Scene {
 
     for (let i = 0; i < this.maxJumpPower; i++) {
       const icon = this.add.rectangle(
-        jumpPowerX + i * 24,
+        jumpPowerX - 180 + i * 24,
         jumpPowerY,
         16,
         16,
