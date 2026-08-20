@@ -26,6 +26,9 @@ export class PlayScene extends Phaser.Scene {
   private dashPowerStock = 2;
   private dashPowerRechargeTimers: number[] = [0, 0];
   private lastSafeTileTop = { x: 0, y: 0 };
+  private goalFlagPole!: Phaser.GameObjects.Rectangle;
+  private goalFlagTriangle!: Phaser.GameObjects.Polygon;
+  private isGameCleared = false;
   private hpBarFrame!: Phaser.GameObjects.Rectangle;
   private hpBarFill!: Phaser.GameObjects.Rectangle;
   private hpText!: Phaser.GameObjects.Text;
@@ -53,6 +56,13 @@ export class PlayScene extends Phaser.Scene {
     this.dashPowerStock = 2;
     this.dashPowerRechargeTimers = [0, 0];
     this.lastSafeTileTop = { x: 0, y: 0 };
+    this.isGameCleared = false;
+    if (this.goalFlagPole) {
+      this.goalFlagPole.destroy();
+    }
+    if (this.goalFlagTriangle) {
+      this.goalFlagTriangle.destroy();
+    }
     if (this.player) {
       this.player.destroy();
     }
@@ -99,14 +109,27 @@ export class PlayScene extends Phaser.Scene {
     this.worldStartX = startX;
     this.worldWidth = mapWidth;
 
+    let goalFlagX = 0;
+    let goalFlagY = 0;
+    let hasGoalFlag = false;
+
     for (let row = 0; row < levelMap.length; row++) {
       for (let col = 0; col < levelMap[row].length; col++) {
-        if (levelMap[row][col] !== '1') {
+        const cell = levelMap[row][col];
+        const x = startX + col * tileSize;
+        const y = startY + row * tileSize;
+
+        if (cell === 'F') {
+          goalFlagX = x + tileSize / 2;
+          goalFlagY = y + tileSize / 2;
+          hasGoalFlag = true;
           continue;
         }
 
-        const x = startX + col * tileSize;
-        const y = startY + row * tileSize;
+        if (cell !== '1') {
+          continue;
+        }
+
         this.add.rectangle(
           x + tileSize / 2,
           y + tileSize / 2,
@@ -117,6 +140,12 @@ export class PlayScene extends Phaser.Scene {
         ).setStrokeStyle(4, 0x000000);
         this.terrainTiles.push({ x, y, width: tileSize, height: tileSize });
       }
+    }
+
+    if (!hasGoalFlag) {
+      const fallbackColumn = levelMap[0].length - 5;
+      goalFlagX = startX + fallbackColumn * tileSize + tileSize / 2;
+      goalFlagY = startY + tileSize / 2;
     }
 
     const spawnX = startX + tileSize / 2;
@@ -133,6 +162,26 @@ export class PlayScene extends Phaser.Scene {
       x: spawnX,
       y: spawnY,
     };
+
+    this.goalFlagPole = this.add.rectangle(
+      goalFlagX,
+      goalFlagY - 44,
+      12,
+      110,
+      0x3d3d3d,
+      1,
+    ).setStrokeStyle(2, 0x000000);
+    this.goalFlagTriangle = this.add.polygon(
+      goalFlagX + 16,
+      goalFlagY - 52,
+      [
+        { x: 0, y: 0 },
+        { x: 52, y: -26 },
+        { x: 0, y: -52 },
+      ],
+      0x00ff66,
+      1,
+    ).setStrokeStyle(2, 0x000000);
 
     const hpBarX = 26;
     const hpBarY = 26;
@@ -486,9 +535,29 @@ export class PlayScene extends Phaser.Scene {
     this.updateJumpPower(deltaSeconds);
     this.updateDashPower(deltaSeconds);
 
+    if (this.isGameCleared) {
+      return;
+    }
+
     if (this.player.y > fallThreshold) {
       this.setHp(this.currentHp - 20);
       this.respawnToLastSafePosition();
+      return;
+    }
+
+    const playerLeft = this.player.x - this.player.width / 2;
+    const playerRight = this.player.x + this.player.width / 2;
+    const playerTop = this.player.y - this.player.height / 2;
+    const playerBottom = this.player.y + this.player.height / 2;
+    const flagLeft = this.goalFlagPole.x - this.goalFlagPole.width / 2 - 60;
+    const flagRight = this.goalFlagPole.x + this.goalFlagPole.width / 2 + 40;
+    const flagTop = this.goalFlagPole.y - this.goalFlagPole.height / 2;
+    const flagBottom = this.goalFlagPole.y + this.goalFlagPole.height / 2;
+
+    if (playerRight >= flagLeft && playerLeft <= flagRight && playerBottom >= flagTop && playerTop <= flagBottom) {
+      this.isGameCleared = true;
+      this.scene.stop();
+      this.scene.start('ClearScene');
       return;
     }
 

@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { ClearScene } from './scenes/ClearScene';
 import { GameOverScene } from './scenes/GameOverScene';
 import { PauseScene } from './scenes/PauseScene';
 import { PlayScene } from './scenes/PlayScene';
@@ -14,7 +15,7 @@ const config: Phaser.Types.Core.GameConfig = {
     width: 1280,
     height: 720,
   },
-  scene: [TitleScene, PlayScene, PauseScene, GameOverScene],
+  scene: [TitleScene, PlayScene, PauseScene, GameOverScene, ClearScene],
 };
 
 const game = new Phaser.Game(config);
