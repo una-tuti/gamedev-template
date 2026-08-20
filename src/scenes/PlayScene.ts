@@ -35,6 +35,8 @@ export class PlayScene extends Phaser.Scene {
   private dashPowerLabel!: Phaser.GameObjects.Text;
   private dashPowerIcons: Phaser.GameObjects.Rectangle[] = [];
   private dashPowerTimers: Phaser.GameObjects.Text[] = [];
+  private worldStartX = 0;
+  private worldWidth = 0;
 
   private resetRuntimeState(): void {
     this.playerVelocityY = 0;
@@ -85,18 +87,24 @@ export class PlayScene extends Phaser.Scene {
     this.resetRuntimeState();
 
     const tileSize = 64;
-    const cols = 10;
-    const rows = 2;
-    const terrainWidth = cols * tileSize;
-    const terrainHeight = rows * tileSize;
-    const extensionCols = 6;
-    const extensionPadding = 4 * tileSize;
-    const totalWidth = terrainWidth + extensionPadding + extensionCols * tileSize;
-    const startX = this.scale.width / 2 - terrainWidth / 2;
-    const startY = this.scale.height - terrainHeight;
+    const levelMap = [
+      '............................................................',
+      '111111111111111111111111111111111111111111111111111111111111',
+      '111111111111111111111111111111111111111111111111111111111111',
+    ];
 
-    for (let row = 0; row < rows; row++) {
-      for (let col = 0; col < cols; col++) {
+    const startY = this.scale.height - levelMap.length * tileSize;
+    const mapWidth = levelMap[0].length * tileSize;
+    const startX = 0;
+    this.worldStartX = startX;
+    this.worldWidth = mapWidth;
+
+    for (let row = 0; row < levelMap.length; row++) {
+      for (let col = 0; col < levelMap[row].length; col++) {
+        if (levelMap[row][col] !== '1') {
+          continue;
+        }
+
         const x = startX + col * tileSize;
         const y = startY + row * tileSize;
         this.add.rectangle(
@@ -111,34 +119,19 @@ export class PlayScene extends Phaser.Scene {
       }
     }
 
-    const extensionStartX = startX + terrainWidth + tileSize * 4;
-    for (let row = 0; row < 2; row++) {
-      for (let col = 0; col < extensionCols; col++) {
-        const x = extensionStartX + col * tileSize;
-        const y = startY + row * tileSize;
-        this.add.rectangle(
-          x + tileSize / 2,
-          y + tileSize / 2,
-          tileSize,
-          tileSize,
-          0xffffff,
-          1,
-        ).setStrokeStyle(4, 0x000000);
-        this.terrainTiles.push({ x, y, width: tileSize, height: tileSize });
-      }
-    }
-
+    const spawnX = startX + tileSize / 2;
+    const spawnY = startY - tileSize / 2;
     this.player = this.add.rectangle(
-      startX + tileSize / 2,
-      startY - tileSize / 2,
+      spawnX,
+      spawnY,
       tileSize,
       tileSize,
       0xff0000,
       1,
     ).setStrokeStyle(3, 0x000000);
     this.lastSafeTileTop = {
-      x: startX + tileSize / 2,
-      y: startY - tileSize / 2,
+      x: spawnX,
+      y: spawnY,
     };
 
     const hpBarX = 26;
@@ -266,7 +259,7 @@ export class PlayScene extends Phaser.Scene {
     this.updateJumpPowerUi();
     this.updateDashPowerUi();
 
-    const worldWidth = startX + totalWidth + tileSize;
+    const worldWidth = this.worldStartX + this.worldWidth + tileSize;
     this.cameras.main.startFollow(this.player, false, 0.08, 0.08);
     this.cameras.main.setBounds(0, 0, worldWidth, this.scale.height);
 
@@ -477,14 +470,8 @@ export class PlayScene extends Phaser.Scene {
 
   update(): void {
     const tileSize = 64;
-    const cols = 10;
-    const extensionCols = 6;
-    const terrainWidth = cols * tileSize;
-    const extensionPadding = 4 * tileSize;
-    const totalWidth = terrainWidth + extensionPadding + extensionCols * tileSize;
-    const startX = this.scale.width / 2 - terrainWidth / 2;
-    const minX = startX + tileSize / 2;
-    const maxX = startX + totalWidth - tileSize / 2;
+    const minX = this.worldStartX + tileSize / 2;
+    const maxX = this.worldStartX + this.worldWidth - tileSize / 2;
     const moveSpeed = tileSize * 6;
     const dashDistance = tileSize * 6;
     const dashDuration = 0.1;
