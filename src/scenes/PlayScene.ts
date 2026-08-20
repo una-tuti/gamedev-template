@@ -163,21 +163,27 @@ export class PlayScene extends Phaser.Scene {
       y: spawnY,
     };
 
+    const poleHeight = tileSize;
+    const triangleHeight = poleHeight / 2;
+    const triangleHalfWidth = poleHeight / 2;
+    const poleCenterX = goalFlagX;
+    const poleTopY = goalFlagY - poleHeight / 2;
+
     this.goalFlagPole = this.add.rectangle(
-      goalFlagX,
-      goalFlagY - 44,
+      poleCenterX,
+      poleTopY + poleHeight / 2,
       12,
-      110,
+      poleHeight,
       0x3d3d3d,
       1,
     ).setStrokeStyle(2, 0x000000);
     this.goalFlagTriangle = this.add.polygon(
-      goalFlagX + 16,
-      goalFlagY - 52,
+      poleCenterX + 12,
+      poleTopY + triangleHeight + 2,
       [
         { x: 0, y: 0 },
-        { x: 52, y: -26 },
-        { x: 0, y: -52 },
+        { x: triangleHalfWidth, y: -triangleHeight / 2 },
+        { x: 0, y: -triangleHeight },
       ],
       0x00ff66,
       1,
