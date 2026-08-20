@@ -23,6 +23,9 @@ export class PlayScene extends Phaser.Scene {
     const rows = 2;
     const terrainWidth = cols * tileSize;
     const terrainHeight = rows * tileSize;
+    const extensionCols = 6;
+    const extensionPadding = 4 * tileSize;
+    const totalWidth = terrainWidth + extensionPadding + extensionCols * tileSize;
     const startX = this.scale.width / 2 - terrainWidth / 2;
     const startY = this.scale.height - terrainHeight;
     this.groundY = startY;
@@ -31,6 +34,20 @@ export class PlayScene extends Phaser.Scene {
       for (let col = 0; col < cols; col++) {
         this.add.rectangle(
           startX + col * tileSize + tileSize / 2,
+          startY + row * tileSize + tileSize / 2,
+          tileSize,
+          tileSize,
+          0xffffff,
+          1,
+        ).setStrokeStyle(4, 0x000000);
+      }
+    }
+
+    const extensionStartX = startX + terrainWidth + tileSize * 4;
+    for (let row = 0; row < 2; row++) {
+      for (let col = 0; col < extensionCols; col++) {
+        this.add.rectangle(
+          extensionStartX + col * tileSize + tileSize / 2,
           startY + row * tileSize + tileSize / 2,
           tileSize,
           tileSize,
@@ -49,6 +66,10 @@ export class PlayScene extends Phaser.Scene {
       1,
     ).setStrokeStyle(3, 0x000000);
 
+    const worldWidth = startX + totalWidth + tileSize;
+    this.cameras.main.startFollow(this.player, false, 0.08, 0.08);
+    this.cameras.main.setBounds(0, 0, worldWidth, this.scale.height);
+
     const keyboard = this.input.keyboard;
     if (keyboard) {
       this.cursors = keyboard.createCursorKeys();
@@ -64,10 +85,13 @@ export class PlayScene extends Phaser.Scene {
   update(): void {
     const tileSize = 64;
     const cols = 10;
+    const extensionCols = 6;
     const terrainWidth = cols * tileSize;
+    const extensionPadding = 4 * tileSize;
+    const totalWidth = terrainWidth + extensionPadding + extensionCols * tileSize;
     const startX = this.scale.width / 2 - terrainWidth / 2;
     const minX = startX + tileSize / 2;
-    const maxX = startX + terrainWidth - tileSize / 2;
+    const maxX = startX + totalWidth - tileSize / 2;
     const moveSpeed = tileSize * 6;
     const dashDistance = tileSize * 6;
     const dashDuration = 0.1;
