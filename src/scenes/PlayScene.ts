@@ -36,7 +36,54 @@ export class PlayScene extends Phaser.Scene {
   private dashPowerIcons: Phaser.GameObjects.Rectangle[] = [];
   private dashPowerTimers: Phaser.GameObjects.Text[] = [];
 
+  private resetRuntimeState(): void {
+    this.playerVelocityY = 0;
+    this.terrainTiles = [];
+    this.jumpHoldTimer = 0;
+    this.jumpStartY = 0;
+    this.isJumping = false;
+    this.dashTimer = 0;
+    this.dashDirection = 0;
+    this.facingDirection = 1;
+    this.currentHp = 100;
+    this.jumpPowerStock = 2;
+    this.jumpPowerRechargeTimers = [0, 0];
+    this.dashPowerStock = 2;
+    this.dashPowerRechargeTimers = [0, 0];
+    this.lastSafeTileTop = { x: 0, y: 0 };
+    if (this.player) {
+      this.player.destroy();
+    }
+    this.cameras.main.stopFollow();
+    this.jumpPowerIcons.forEach((icon) => icon.destroy());
+    this.jumpPowerTimers.forEach((timerText) => timerText.destroy());
+    this.dashPowerIcons.forEach((icon) => icon.destroy());
+    this.dashPowerTimers.forEach((timerText) => timerText.destroy());
+    this.jumpPowerIcons = [];
+    this.jumpPowerTimers = [];
+    this.dashPowerIcons = [];
+    this.dashPowerTimers = [];
+
+    if (this.hpBarFrame) {
+      this.hpBarFrame.destroy();
+    }
+    if (this.hpBarFill) {
+      this.hpBarFill.destroy();
+    }
+    if (this.hpText) {
+      this.hpText.destroy();
+    }
+    if (this.jumpPowerLabel) {
+      this.jumpPowerLabel.destroy();
+    }
+    if (this.dashPowerLabel) {
+      this.dashPowerLabel.destroy();
+    }
+  }
+
   create(): void {
+    this.resetRuntimeState();
+
     const tileSize = 64;
     const cols = 10;
     const rows = 2;
