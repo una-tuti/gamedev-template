@@ -22,6 +22,9 @@ export class PlayScene extends Phaser.Scene {
   private maxJumpPower = 2;
   private jumpPowerStock = 2;
   private jumpPowerRechargeTimers: number[] = [0, 0];
+  private maxDashPower = 2;
+  private dashPowerStock = 2;
+  private dashPowerRechargeTimers: number[] = [0, 0];
   private lastSafeTileTop = { x: 0, y: 0 };
   private hpBarFrame!: Phaser.GameObjects.Rectangle;
   private hpBarFill!: Phaser.GameObjects.Rectangle;
@@ -29,6 +32,9 @@ export class PlayScene extends Phaser.Scene {
   private jumpPowerLabel!: Phaser.GameObjects.Text;
   private jumpPowerIcons: Phaser.GameObjects.Rectangle[] = [];
   private jumpPowerTimers: Phaser.GameObjects.Text[] = [];
+  private dashPowerLabel!: Phaser.GameObjects.Text;
+  private dashPowerIcons: Phaser.GameObjects.Rectangle[] = [];
+  private dashPowerTimers: Phaser.GameObjects.Text[] = [];
 
   create(): void {
     const tileSize = 64;
@@ -126,9 +132,12 @@ export class PlayScene extends Phaser.Scene {
 
     const jumpPowerX = hpBarX + hpBarWidth + 18;
     const jumpPowerY = hpBarY + hpBarHeight + 18;
+    const powerGroupOffsetX = 150;
+    const powerGroupOffsetY = 0;
+
     this.jumpPowerLabel = this.add.text(
-      jumpPowerX - 200,
-      hpBarY + hpBarHeight + 50,
+      jumpPowerX + powerGroupOffsetX,
+      hpBarY + hpBarHeight + 2,
       'JP',
       {
         color: '#000000',
@@ -141,8 +150,8 @@ export class PlayScene extends Phaser.Scene {
 
     for (let i = 0; i < this.maxJumpPower; i++) {
       const icon = this.add.rectangle(
-        jumpPowerX - 180 + i * 24,
-        jumpPowerY,
+        jumpPowerX + powerGroupOffsetX + 34 + i * 24,
+        jumpPowerY + powerGroupOffsetY,
         16,
         16,
         0x00ff00,
@@ -153,8 +162,8 @@ export class PlayScene extends Phaser.Scene {
       this.jumpPowerIcons.push(icon);
 
       const timerText = this.add.text(
-        jumpPowerX + i * 24,
-        jumpPowerY + 20,
+        jumpPowerX + powerGroupOffsetX + 34 + i * 24,
+        jumpPowerY + powerGroupOffsetY + 20,
         '0.0s',
         {
           color: '#000000',
@@ -166,8 +175,49 @@ export class PlayScene extends Phaser.Scene {
       this.jumpPowerTimers.push(timerText);
     }
 
+    this.dashPowerLabel = this.add.text(
+      jumpPowerX + powerGroupOffsetX + 120,
+      hpBarY + hpBarHeight + 2,
+      'DP',
+      {
+        color: '#000000',
+        fontSize: '18px',
+        fontStyle: 'bold',
+      },
+    )
+      .setOrigin(0, 0.5)
+      .setScrollFactor(0);
+
+    for (let i = 0; i < this.maxDashPower; i++) {
+      const icon = this.add.rectangle(
+        jumpPowerX + powerGroupOffsetX + 154 + i * 24,
+        jumpPowerY + powerGroupOffsetY,
+        16,
+        16,
+        0x0000ff,
+        1,
+      )
+        .setStrokeStyle(2, 0x000000)
+        .setScrollFactor(0);
+      this.dashPowerIcons.push(icon);
+
+      const timerText = this.add.text(
+        jumpPowerX + powerGroupOffsetX + 154 + i * 24,
+        jumpPowerY + powerGroupOffsetY + 20,
+        '0.0s',
+        {
+          color: '#000000',
+          fontSize: '10px',
+        },
+      )
+        .setOrigin(0.5)
+        .setScrollFactor(0);
+      this.dashPowerTimers.push(timerText);
+    }
+
     this.setHp(this.maxHp);
     this.updateJumpPowerUi();
+    this.updateDashPowerUi();
 
     const worldWidth = startX + totalWidth + tileSize;
     this.cameras.main.startFollow(this.player, false, 0.08, 0.08);
@@ -245,14 +295,63 @@ export class PlayScene extends Phaser.Scene {
       const timer = this.jumpPowerRechargeTimers[i] ?? 0;
       if (timer > 0) {
         this.jumpPowerRechargeTimers[i] = Math.max(0, timer - deltaSeconds);
-      }
-
-      if (this.jumpPowerRechargeTimers[i] === 0 && this.jumpPowerStock < i + 1) {
-        this.jumpPowerStock = Math.min(this.maxJumpPower, i + 1);
+        if (this.jumpPowerRechargeTimers[i] === 0) {
+          this.jumpPowerStock = Math.min(this.maxJumpPower, this.jumpPowerStock + 1);
+        }
       }
     }
 
     this.updateJumpPowerUi();
+  }
+
+  private updateDashPowerUi(): void {
+    this.dashPowerLabel.setText(`DP ${this.dashPowerStock}/${this.maxDashPower}`);
+
+    for (let i = 0; i < this.maxDashPower; i++) {
+      const icon = this.dashPowerIcons[i];
+      const timerText = this.dashPowerTimers[i];
+      if (!icon || !timerText) {
+        continue;
+      }
+
+      const timer = this.dashPowerRechargeTimers[i] ?? 0;
+      const isAvailable = timer <= 0;
+      icon.setFillStyle(isAvailable ? 0x0000ff : 0xcccccc);
+      icon.setAlpha(isAvailable ? 1 : 0.45);
+      timerText.setText(isAvailable ? 'Ready' : `${timer.toFixed(1)}s`);
+      timerText.setVisible(!isAvailable);
+      timerText.setX(icon.x);
+      timerText.setY(icon.y + 18);
+    }
+  }
+
+  private consumeDashPower(): void {
+    if (this.dashPowerStock <= 0) {
+      return;
+    }
+
+    const firstReadyIndex = this.dashPowerRechargeTimers.findIndex((timer) => timer <= 0);
+    if (firstReadyIndex === -1) {
+      return;
+    }
+
+    this.dashPowerRechargeTimers[firstReadyIndex] = 2;
+    this.dashPowerStock -= 1;
+    this.updateDashPowerUi();
+  }
+
+  private updateDashPower(deltaSeconds: number): void {
+    for (let i = 0; i < this.maxDashPower; i++) {
+      const timer = this.dashPowerRechargeTimers[i] ?? 0;
+      if (timer > 0) {
+        this.dashPowerRechargeTimers[i] = Math.max(0, timer - deltaSeconds);
+        if (this.dashPowerRechargeTimers[i] === 0) {
+          this.dashPowerStock = Math.min(this.maxDashPower, this.dashPowerStock + 1);
+        }
+      }
+    }
+
+    this.updateDashPowerUi();
   }
 
   private respawnToLastSafePosition(): void {
@@ -351,6 +450,7 @@ export class PlayScene extends Phaser.Scene {
     const fallThreshold = this.scale.height + 200;
 
     this.updateJumpPower(deltaSeconds);
+    this.updateDashPower(deltaSeconds);
 
     if (this.player.y > fallThreshold) {
       this.setHp(this.currentHp - 20);
@@ -366,9 +466,10 @@ export class PlayScene extends Phaser.Scene {
       this.facingDirection = 1;
     }
 
-    if (Phaser.Input.Keyboard.JustDown(this.dashKey) && this.dashTimer <= 0) {
+    if (Phaser.Input.Keyboard.JustDown(this.dashKey) && this.dashTimer <= 0 && this.dashPowerStock > 0) {
       this.dashDirection = this.cursors.left?.isDown ? -1 : this.cursors.right?.isDown ? 1 : this.facingDirection;
       this.dashTimer = dashDuration;
+      this.consumeDashPower();
     }
 
     const previousX = this.player.x;
