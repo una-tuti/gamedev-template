@@ -13,15 +13,22 @@ export class PlayScene extends Phaser.Scene {
   private terrainTiles: Array<{ x: number; y: number; width: number; height: number }> = [];
   private jumpHoldTimer = 0;
   private jumpStartY = 0;
+  private isJumping = false;
   private dashTimer = 0;
   private dashDirection = 0;
   private facingDirection = 1;
   private maxHp = 100;
   private currentHp = 100;
+  private maxJumpPower = 2;
+  private jumpPowerStock = 2;
+  private jumpPowerRechargeTimers: number[] = [0, 0];
   private lastSafeTileTop = { x: 0, y: 0 };
   private hpBarFrame!: Phaser.GameObjects.Rectangle;
   private hpBarFill!: Phaser.GameObjects.Rectangle;
   private hpText!: Phaser.GameObjects.Text;
+  private jumpPowerLabel!: Phaser.GameObjects.Text;
+  private jumpPowerIcons: Phaser.GameObjects.Rectangle[] = [];
+  private jumpPowerTimers: Phaser.GameObjects.Text[] = [];
 
   create(): void {
     const tileSize = 64;
@@ -116,7 +123,51 @@ export class PlayScene extends Phaser.Scene {
     )
       .setOrigin(0, 0.5)
       .setScrollFactor(0);
+
+    const jumpPowerX = hpBarX + hpBarWidth + 18;
+    const jumpPowerY = hpBarY + hpBarHeight + 18;
+    this.jumpPowerLabel = this.add.text(
+      jumpPowerX,
+      jumpPowerY - 20,
+      'JP',
+      {
+        color: '#000000',
+        fontSize: '18px',
+        fontStyle: 'bold',
+      },
+    )
+      .setOrigin(0, 0.5)
+      .setScrollFactor(0);
+
+    for (let i = 0; i < this.maxJumpPower; i++) {
+      const icon = this.add.rectangle(
+        jumpPowerX + i * 24,
+        jumpPowerY,
+        16,
+        16,
+        0x00ff00,
+        1,
+      )
+        .setStrokeStyle(2, 0x000000)
+        .setScrollFactor(0);
+      this.jumpPowerIcons.push(icon);
+
+      const timerText = this.add.text(
+        jumpPowerX + i * 24,
+        jumpPowerY + 20,
+        '0.0s',
+        {
+          color: '#000000',
+          fontSize: '10px',
+        },
+      )
+        .setOrigin(0.5)
+        .setScrollFactor(0);
+      this.jumpPowerTimers.push(timerText);
+    }
+
     this.setHp(this.maxHp);
+    this.updateJumpPowerUi();
 
     const worldWidth = startX + totalWidth + tileSize;
     this.cameras.main.startFollow(this.player, false, 0.08, 0.08);
@@ -151,6 +202,57 @@ export class PlayScene extends Phaser.Scene {
       this.scene.stop();
       this.scene.start('GameOverScene');
     }
+  }
+
+  private updateJumpPowerUi(): void {
+    this.jumpPowerLabel.setText(`JP ${this.jumpPowerStock}/${this.maxJumpPower}`);
+
+    for (let i = 0; i < this.maxJumpPower; i++) {
+      const icon = this.jumpPowerIcons[i];
+      const timerText = this.jumpPowerTimers[i];
+      if (!icon || !timerText) {
+        continue;
+      }
+
+      const timer = this.jumpPowerRechargeTimers[i] ?? 0;
+      const isAvailable = timer <= 0;
+      icon.setFillStyle(isAvailable ? 0x00ff00 : 0xcccccc);
+      icon.setAlpha(isAvailable ? 1 : 0.45);
+      timerText.setText(isAvailable ? 'Ready' : `${timer.toFixed(1)}s`);
+      timerText.setVisible(!isAvailable);
+      timerText.setX(icon.x);
+      timerText.setY(icon.y + 18);
+    }
+  }
+
+  private consumeJumpPower(): void {
+    if (this.jumpPowerStock <= 0) {
+      return;
+    }
+
+    const firstReadyIndex = this.jumpPowerRechargeTimers.findIndex((timer) => timer <= 0);
+    if (firstReadyIndex === -1) {
+      return;
+    }
+
+    this.jumpPowerRechargeTimers[firstReadyIndex] = 2;
+    this.jumpPowerStock -= 1;
+    this.updateJumpPowerUi();
+  }
+
+  private updateJumpPower(deltaSeconds: number): void {
+    for (let i = 0; i < this.maxJumpPower; i++) {
+      const timer = this.jumpPowerRechargeTimers[i] ?? 0;
+      if (timer > 0) {
+        this.jumpPowerRechargeTimers[i] = Math.max(0, timer - deltaSeconds);
+      }
+
+      if (this.jumpPowerRechargeTimers[i] === 0 && this.jumpPowerStock < i + 1) {
+        this.jumpPowerStock = Math.min(this.maxJumpPower, i + 1);
+      }
+    }
+
+    this.updateJumpPowerUi();
   }
 
   private respawnToLastSafePosition(): void {
@@ -214,6 +316,7 @@ export class PlayScene extends Phaser.Scene {
         this.player.y = tileTop - halfHeight;
         this.playerVelocityY = 0;
         this.jumpHoldTimer = 0;
+        this.isJumping = false;
         this.jumpStartY = this.player.y;
         this.lastSafeTileTop = {
           x: tile.x + tile.width / 2,
@@ -246,6 +349,8 @@ export class PlayScene extends Phaser.Scene {
     const jumpVelocity = (tileSize * jumpCells) / 0.05;
     const deltaSeconds = this.game.loop.delta / 1000;
     const fallThreshold = this.scale.height + 200;
+
+    this.updateJumpPower(deltaSeconds);
 
     if (this.player.y > fallThreshold) {
       this.setHp(this.currentHp - 20);
@@ -283,14 +388,20 @@ export class PlayScene extends Phaser.Scene {
 
     this.resolveHorizontalCollisions(previousX);
 
-    if (Phaser.Input.Keyboard.JustDown(this.jumpKey)) {
+    const hasJumpPower = this.jumpPowerStock > 0;
+    const canJump = !this.isJumping && hasJumpPower;
+    if (Phaser.Input.Keyboard.JustDown(this.jumpKey) && canJump) {
       this.playerVelocityY = -jumpVelocity;
       this.jumpStartY = this.player.y;
       this.jumpHoldTimer = 0;
+      this.isJumping = true;
+      this.consumeJumpPower();
     }
 
     if (this.dashTimer > 0) {
-      this.playerVelocityY = 0;
+      if (this.playerVelocityY >= 0) {
+        this.playerVelocityY = 0;
+      }
     } else if (this.playerVelocityY < 0 && this.player.y <= this.jumpStartY - jumpHeight) {
       this.playerVelocityY = 0;
       this.jumpHoldTimer = 0.2;
@@ -299,6 +410,10 @@ export class PlayScene extends Phaser.Scene {
       this.playerVelocityY = 0;
     } else {
       this.playerVelocityY += gravity * deltaSeconds;
+    }
+
+    if (this.playerVelocityY >= 0 && this.isJumping) {
+      this.isJumping = false;
     }
 
     const previousY = this.player.y;
