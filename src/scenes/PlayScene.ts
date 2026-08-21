@@ -27,6 +27,9 @@ export class PlayScene extends Phaser.Scene {
   private dashPowerRechargeTimers: number[] = [0, 0];
   private lastSafeTileTop = { x: 0, y: 0 };
   private respawnDelayTimer = 0;
+  private enemies: Phaser.GameObjects.Rectangle[] = [];
+  private enemyShootCooldowns: number[] = [];
+  private enemyProjectiles: Phaser.GameObjects.Rectangle[] = [];
   private goalFlagPole!: Phaser.GameObjects.Rectangle;
   private goalFlagTriangle!: Phaser.GameObjects.Polygon;
   private isGameCleared = false;
@@ -58,7 +61,12 @@ export class PlayScene extends Phaser.Scene {
     this.dashPowerRechargeTimers = [0, 0];
     this.lastSafeTileTop = { x: 0, y: 0 };
     this.respawnDelayTimer = 0;
+    this.enemyShootCooldowns = [];
     this.isGameCleared = false;
+    this.enemies.forEach((enemy) => enemy.destroy());
+    this.enemies = [];
+    this.enemyProjectiles.forEach((projectile) => projectile.destroy());
+    this.enemyProjectiles = [];
     if (this.goalFlagPole) {
       this.goalFlagPole.destroy();
     }
@@ -100,7 +108,7 @@ export class PlayScene extends Phaser.Scene {
 
     const tileSize = 64;
     const levelMap = [
-      '............................................................',
+      '...............E............................E........F......',
       '111111111111111111111111111111....11111111111111111111111111',
       '111111111111111111111111111111....11111111111111111111111111',
     ];
@@ -114,6 +122,7 @@ export class PlayScene extends Phaser.Scene {
     let goalFlagX = 0;
     let goalFlagY = 0;
     let hasGoalFlag = false;
+    const enemySpawns: Array<{ x: number; y: number }> = [];
 
     for (let row = 0; row < levelMap.length; row++) {
       for (let col = 0; col < levelMap[row].length; col++) {
@@ -125,6 +134,11 @@ export class PlayScene extends Phaser.Scene {
           goalFlagX = x + tileSize / 2;
           goalFlagY = y + tileSize / 2;
           hasGoalFlag = true;
+          continue;
+        }
+
+        if (cell === 'E') {
+          enemySpawns.push({ x: x + tileSize / 2, y: y + tileSize / 2 });
           continue;
         }
 
@@ -164,6 +178,26 @@ export class PlayScene extends Phaser.Scene {
       x: spawnX,
       y: spawnY,
     };
+
+    if (enemySpawns.length === 0) {
+      enemySpawns.push({
+        x: this.worldStartX + this.worldWidth - 8 * tileSize - tileSize / 2,
+        y: this.scale.height - 3 * tileSize + tileSize / 2,
+      });
+    }
+
+    for (const spawn of enemySpawns) {
+      const enemy = this.add.rectangle(
+        spawn.x,
+        spawn.y,
+        tileSize * 0.75,
+        tileSize * 0.75,
+        0x6600cc,
+        1,
+      ).setStrokeStyle(3, 0x000000);
+      this.enemies.push(enemy);
+      this.enemyShootCooldowns.push(1.2);
+    }
 
     const poleHeight = tileSize;
     const triangleHeight = poleHeight / 2;
@@ -546,6 +580,54 @@ export class PlayScene extends Phaser.Scene {
 
     if (this.isGameCleared) {
       return;
+    }
+
+    for (let enemyIndex = 0; enemyIndex < this.enemies.length; enemyIndex++) {
+      const enemy = this.enemies[enemyIndex];
+      if (!enemy) {
+        continue;
+      }
+
+      const cooldown = this.enemyShootCooldowns[enemyIndex] ?? 1.2;
+      this.enemyShootCooldowns[enemyIndex] = Math.max(0, cooldown - deltaSeconds);
+
+      const enemyVisibleOnScreen = enemy.x > this.cameras.main.worldView.left - 32 && enemy.x < this.cameras.main.worldView.right + 32;
+      if (enemyVisibleOnScreen && this.enemyShootCooldowns[enemyIndex] <= 0) {
+        const projectile = this.add.rectangle(
+          enemy.x - enemy.width / 2,
+          enemy.y,
+          18,
+          18,
+          0x000000,
+          1,
+        ).setStrokeStyle(2, 0xffffff);
+        this.enemyProjectiles.push(projectile);
+        this.enemyShootCooldowns[enemyIndex] = 1.2;
+      }
+    }
+
+    const projectileSpeed = 4 * tileSize;
+    for (let i = this.enemyProjectiles.length - 1; i >= 0; i--) {
+      const projectile = this.enemyProjectiles[i];
+      if (!projectile) {
+        continue;
+      }
+
+      projectile.x -= projectileSpeed * deltaSeconds;
+      const playerBounds = this.player.getBounds();
+      const projectileBounds = projectile.getBounds();
+
+      if (Phaser.Geom.Intersects.RectangleToRectangle(playerBounds, projectileBounds)) {
+        this.setHp(this.currentHp - 10);
+        projectile.destroy();
+        this.enemyProjectiles.splice(i, 1);
+        continue;
+      }
+
+      if (projectile.x + projectile.width / 2 < this.worldStartX - 50) {
+        projectile.destroy();
+        this.enemyProjectiles.splice(i, 1);
+      }
     }
 
     if (this.respawnDelayTimer > 0) {
