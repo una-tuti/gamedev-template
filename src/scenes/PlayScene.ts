@@ -26,6 +26,7 @@ export class PlayScene extends Phaser.Scene {
   private dashPowerStock = 2;
   private dashPowerRechargeTimers: number[] = [0, 0];
   private lastSafeTileTop = { x: 0, y: 0 };
+  private respawnDelayTimer = 0;
   private goalFlagPole!: Phaser.GameObjects.Rectangle;
   private goalFlagTriangle!: Phaser.GameObjects.Polygon;
   private isGameCleared = false;
@@ -56,6 +57,7 @@ export class PlayScene extends Phaser.Scene {
     this.dashPowerStock = 2;
     this.dashPowerRechargeTimers = [0, 0];
     this.lastSafeTileTop = { x: 0, y: 0 };
+    this.respawnDelayTimer = 0;
     this.isGameCleared = false;
     if (this.goalFlagPole) {
       this.goalFlagPole.destroy();
@@ -99,8 +101,8 @@ export class PlayScene extends Phaser.Scene {
     const tileSize = 64;
     const levelMap = [
       '............................................................',
-      '111111111111111111111111111111111111111111111111111111111111',
-      '111111111111111111111111111111111111111111111111111111111111',
+      '111111111111111111111111111111....11111111111111111111111111',
+      '111111111111111111111111111111....11111111111111111111111111',
     ];
 
     const startY = this.scale.height - levelMap.length * tileSize;
@@ -537,6 +539,7 @@ export class PlayScene extends Phaser.Scene {
     const jumpVelocity = (tileSize * jumpCells) / 0.05;
     const deltaSeconds = this.game.loop.delta / 1000;
     const fallThreshold = this.scale.height + 200;
+    const respawnDelaySeconds = 0.5;
 
     this.updateJumpPower(deltaSeconds);
     this.updateDashPower(deltaSeconds);
@@ -545,9 +548,18 @@ export class PlayScene extends Phaser.Scene {
       return;
     }
 
+    if (this.respawnDelayTimer > 0) {
+      this.respawnDelayTimer = Math.max(0, this.respawnDelayTimer - deltaSeconds);
+      if (this.respawnDelayTimer === 0) {
+        this.setHp(this.currentHp - 20);
+        this.respawnToLastSafePosition();
+      }
+      return;
+    }
+
     if (this.player.y > fallThreshold) {
-      this.setHp(this.currentHp - 20);
-      this.respawnToLastSafePosition();
+      this.respawnDelayTimer = respawnDelaySeconds;
+      this.playerVelocityY = 0;
       return;
     }
 
