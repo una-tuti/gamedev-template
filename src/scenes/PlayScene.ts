@@ -351,8 +351,9 @@ export class PlayScene extends Phaser.Scene {
     this.updateDashPowerUi();
 
     const worldWidth = this.worldStartX + this.worldWidth + tileSize;
-    this.cameras.main.startFollow(this.player, false, 0.08, 0.08);
-    this.cameras.main.setBounds(0, 0, worldWidth, this.scale.height);
+    this.cameras.main.startFollow(this.player, false, 0.18, 0.08);
+    this.cameras.main.setBounds(0, -this.scale.height, worldWidth, this.scale.height * 2);
+    this.cameras.main.setDeadzone(this.scale.width * 0.35, 280);
 
     const keyboard = this.input.keyboard;
     if (keyboard) {
