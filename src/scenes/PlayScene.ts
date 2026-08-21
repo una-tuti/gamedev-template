@@ -30,6 +30,7 @@ export class PlayScene extends Phaser.Scene {
   private enemies: Phaser.GameObjects.Rectangle[] = [];
   private enemyShootCooldowns: number[] = [];
   private enemyProjectiles: Phaser.GameObjects.Rectangle[] = [];
+  private chargeItems: Phaser.GameObjects.Rectangle[] = [];
   private goalFlagPole!: Phaser.GameObjects.Rectangle;
   private goalFlagTriangle!: Phaser.GameObjects.Polygon;
   private isGameCleared = false;
@@ -67,6 +68,8 @@ export class PlayScene extends Phaser.Scene {
     this.enemies = [];
     this.enemyProjectiles.forEach((projectile) => projectile.destroy());
     this.enemyProjectiles = [];
+    this.chargeItems.forEach((item) => item.destroy());
+    this.chargeItems = [];
     if (this.goalFlagPole) {
       this.goalFlagPole.destroy();
     }
@@ -108,7 +111,7 @@ export class PlayScene extends Phaser.Scene {
 
     const tileSize = 64;
     const levelMap = [
-      '...............E............................E........F......',
+      '...............E........C....................E........F......',
       '111111111111111111111111111111....11111111111111111111111111',
       '111111111111111111111111111111....11111111111111111111111111',
     ];
@@ -139,6 +142,19 @@ export class PlayScene extends Phaser.Scene {
 
         if (cell === 'E') {
           enemySpawns.push({ x: x + tileSize / 2, y: y + tileSize / 2 });
+          continue;
+        }
+
+        if (cell === 'C') {
+          const chargeItem = this.add.rectangle(
+            x + tileSize / 2,
+            y + tileSize / 2,
+            24,
+            24,
+            0x00ffff,
+            1,
+          ).setStrokeStyle(2, 0x000000);
+          this.chargeItems.push(chargeItem);
           continue;
         }
 
@@ -628,6 +644,26 @@ export class PlayScene extends Phaser.Scene {
       if (projectile.x + projectile.width / 2 < this.worldStartX - 50) {
         projectile.destroy();
         this.enemyProjectiles.splice(i, 1);
+      }
+    }
+
+    for (let i = this.chargeItems.length - 1; i >= 0; i--) {
+      const item = this.chargeItems[i];
+      if (!item) {
+        continue;
+      }
+
+      const playerBounds = this.player.getBounds();
+      const itemBounds = item.getBounds();
+      if (Phaser.Geom.Intersects.RectangleToRectangle(playerBounds, itemBounds)) {
+        this.jumpPowerStock = this.maxJumpPower;
+        this.jumpPowerRechargeTimers = new Array(this.maxJumpPower).fill(0);
+        this.dashPowerStock = this.maxDashPower;
+        this.dashPowerRechargeTimers = new Array(this.maxDashPower).fill(0);
+        this.updateJumpPowerUi();
+        this.updateDashPowerUi();
+        item.destroy();
+        this.chargeItems.splice(i, 1);
       }
     }
 
